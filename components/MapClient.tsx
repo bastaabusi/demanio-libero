@@ -250,7 +250,8 @@ function InteractivePOIs({ onPoiSelect }: { onPoiSelect: (lat: number, lng: numb
   useEffect(() => {
     const fetchLocalPOIs = async () => {
       const zoom = map.getZoom();
-      if (zoom < 15) {
+      // Alziamo leggermente lo zoom a 16 per evitare aree troppo vaste che farebbero esplodere l'API
+      if (zoom < 16) {
         setPois([]);
         return; 
       }
@@ -258,24 +259,36 @@ function InteractivePOIs({ onPoiSelect }: { onPoiSelect: (lat: number, lng: numb
       const bounds = map.getBounds();
       const bbox = `${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()}`;
       
-      // Usiamo 'nwr' (Node, Way, Relation) con 'out center' per avere sempre coordinate sicure
       const query = `
-        [out:json];
+        [out:json][timeout:5];
         (
           nwr["leisure"="beach_resort"](${bbox});
           nwr["amenity"="bar"](${bbox});
           nwr["amenity"="restaurant"](${bbox});
           nwr["natural"="beach"](${bbox});
         );
-        out center;
+        out center 50;
       `;
 
       try {
         const response = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
-        const data = await response.json();
+        
+        // Controlliamo se la risposta è ok prima di leggerla come JSON
+        if (!response.ok) {
+          console.warn("Overpass API occupata o limitata.");
+          return;
+        }
+
+        const textResponse = await response.text();
+        
+        // Verifichiamo che inizi con '{' (quindi sia davvero JSON e non una pagina HTML di errore)
+        if (!textResponse.trim().startsWith('{')) {
+          return;
+        }
+
+        const data = JSON.parse(textResponse);
         
         if (data && data.elements) {
-          // Filtriamo solo i POI che hanno un nome E coordinate valide (sia lat/lon dirette che del centro)
           const validPois = data.elements
             .map((el: any) => ({
               id: el.id,
@@ -289,7 +302,8 @@ function InteractivePOIs({ onPoiSelect }: { onPoiSelect: (lat: number, lng: numb
           setPois(validPois);
         }
       } catch (e) {
-        console.error("Errore download POI", e);
+        // Ignoriamo silenziosamente l'errore di rete/parsing per non rompere l'esperienza utente
+        console.warn("Impossibile caricare i POI locali in questo momento.");
       }
     };
 
