@@ -49,13 +49,13 @@ export default async function DashboardPage() {
               <p className="text-2xl font-bold text-slate-900">{totalReports > 0 ? (totalReports * 0.8).toFixed(0) : 0}</p>
             </div>
           </div>
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+          {/* <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
              <div className="bg-emerald-100 p-3 rounded-xl text-emerald-600"><TrendingUp size={24} /></div>
              <div>
               <p className="text-sm text-slate-500 font-medium">Copertura Territoriale</p>
               <p className="text-2xl font-bold text-slate-900">Alta</p>
             </div>
-          </div>
+          </div> */}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

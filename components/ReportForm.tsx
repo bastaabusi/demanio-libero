@@ -1,9 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { X, Camera, Trash2, Loader2, ShieldAlert } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { getDeviceId } from '@/lib/session';
 import toast from 'react-hot-toast';
-
 interface ReportFormProps {
   draftLocation: { lat: number, lng: number };
   onCancel: () => void;
@@ -21,6 +20,8 @@ export default function ReportForm({ draftLocation, onCancel, onSuccess }: Repor
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const termsCheckboxRef = useRef<HTMLInputElement>(null);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -59,8 +60,18 @@ export default function ReportForm({ draftLocation, onCancel, onSuccess }: Repor
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Controllo di sicurezza aggiuntivo per il checkbox
+    if (!termsAccepted) {
+      toast.error('Devi accettare i termini per procedere.');
+      termsCheckboxRef.current?.focus();
+      return;
+    }
+
     setIsSubmitting(true);
     const deviceId = getDeviceId();
+
+    
     
     // Inizializziamo un singolo toast per aggiornarlo in tempo reale
     const loadingToastId = toast.loading('Invio segnalazione in corso...');
@@ -176,23 +187,23 @@ export default function ReportForm({ draftLocation, onCancel, onSuccess }: Repor
           <div className="space-y-2">
             <label className="text-sm font-semibold text-slate-700">Tipo di irregolarità *</label>
             <select required value={category} onChange={(e) => setCategory(e.target.value)} className="w-full p-4 rounded-xl border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-blue-600 outline-none">
-              <option value="" disabled>Seleziona dalla lista...</option>
-              <option value="pedaggio_accesso">Richiesta pedaggio per transito/accesso</option>
-              <option value="cancello_chiuso">Sbarra o cancello che blocca il passaggio</option>
-              <option value="omessa_ricevuta">Pagamento senza scontrino (Nero)</option>
-              <option value="barriera_architettonica">Barriera per disabili in area pubblica</option>
+              <option value="" className="text-slate-900" disabled>Seleziona dalla lista...</option>
+              <option value="pedaggio_accesso" className="text-slate-900">Richiesta pedaggio per transito/accesso</option>
+              <option value="cancello_chiuso" className="text-slate-900">Sbarra o cancello che blocca il passaggio</option>
+              <option value="omessa_ricevuta" className="text-slate-900" >Pagamento senza scontrino (Nero)</option>
+              <option value="barriera_architettonica" className="text-slate-900">Barriera per disabili in area pubblica</option>
             </select>
           </div>
 
           <div className="space-y-2">
             <label className="text-sm font-semibold text-slate-700">Cosa è successo? *</label>
-            <textarea required maxLength={250} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Es: Mi hanno chiesto 5€..." className="w-full p-4 rounded-xl border border-slate-200 bg-slate-50 h-28 resize-none focus:ring-2 focus:ring-blue-600 outline-none" />
+            <textarea required maxLength={250} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Es: Mi hanno chiesto 5€..." className="w-full p-4 rounded-xl border border-slate-200 text-slate-900 bg-slate-50 h-28 resize-none focus:ring-2 focus:ring-blue-600 outline-none" />
           </div>
 
           {category === 'pedaggio_accesso' && (
              <div className="space-y-2">
                <label className="text-sm font-semibold text-slate-700">Importo richiesto (€)</label>
-               <input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" className="w-full p-4 rounded-xl border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-blue-600 outline-none" />
+               <input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" className="w-full text-slate-900 p-4 rounded-xl border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-blue-600 outline-none" />
              </div>
           )}
 
@@ -202,6 +213,7 @@ export default function ReportForm({ draftLocation, onCancel, onSuccess }: Repor
       type="checkbox" 
       required 
       checked={termsAccepted} 
+      ref={termsCheckboxRef}
       onChange={(e) => setTermsAccepted(e.target.checked)} 
       className="w-5 h-5 accent-red-600 shrink-0" 
     />
