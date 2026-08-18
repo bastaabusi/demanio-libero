@@ -118,10 +118,25 @@ export default function MapClient() {
           <ZoomControl position="bottomright" /> 
           <MapClickHandler active={flowState === 'map'} onLocationSelect={(lat, lng) => { setDraftLocation({lat, lng}); setFlowState('draft'); }} />
           
-          <TileLayer
+          {/* <TileLayer
             attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
             url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-          />
+          /> */}
+
+          <TileLayer
+  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+  url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}{r}.png"
+/>
+
+          <InteractivePOIs 
+  onPoiSelect={(lat, lng, name) => {
+    // Quando l'utente clicca "Segnala qui" su un'attività commerciale:
+    setDraftLocation({ lat, lng }); 
+    setFlowState('draft');
+    toast.success(`Segnalazione su: ${name}`);
+    // (Nel form poi potrai recuperare questo nome se vuoi, magari salvandolo in uno State)
+  }} 
+/>
           
           {/* GRUPPO CLUSTER: Raggruppa i marker quando si fa zoom out */}
           <MarkerClusterGroup chunkedLoading={true} maxClusterRadius={50}>
@@ -225,5 +240,89 @@ export default function MapClient() {
   </div>
 )}
     </div>
+  );
+}
+
+function InteractivePOIs({ onPoiSelect }: { onPoiSelect: (lat: number, lng: number, name: string) => void }) {
+  const map = useMap();
+  const [pois, setPois] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchLocalPOIs = async () => {
+      const zoom = map.getZoom();
+      if (zoom < 15) {
+        setPois([]);
+        return; 
+      }
+
+      const bounds = map.getBounds();
+      const bbox = `${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()}`;
+      
+      // Usiamo 'nwr' (Node, Way, Relation) con 'out center' per avere sempre coordinate sicure
+      const query = `
+        [out:json];
+        (
+          nwr["leisure"="beach_resort"](${bbox});
+          nwr["amenity"="bar"](${bbox});
+          nwr["amenity"="restaurant"](${bbox});
+          nwr["natural"="beach"](${bbox});
+        );
+        out center;
+      `;
+
+      try {
+        const response = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
+        const data = await response.json();
+        
+        if (data && data.elements) {
+          // Filtriamo solo i POI che hanno un nome E coordinate valide (sia lat/lon dirette che del centro)
+          const validPois = data.elements
+            .map((el: any) => ({
+              id: el.id,
+              name: el.tags?.name,
+              category: el.tags?.amenity || el.tags?.leisure || el.tags?.natural,
+              lat: el.lat || el.center?.lat,
+              lon: el.lon || el.center?.lon
+            }))
+            .filter((poi: any) => poi.name && typeof poi.lat === 'number' && typeof poi.lon === 'number');
+
+          setPois(validPois);
+        }
+      } catch (e) {
+        console.error("Errore download POI", e);
+      }
+    };
+
+    map.on('moveend', fetchLocalPOIs);
+    fetchLocalPOIs();
+
+    return () => { map.off('moveend', fetchLocalPOIs); };
+  }, [map]);
+
+  const poiIcon = new L.Icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    iconSize: [18, 30], iconAnchor: [9, 30], popupAnchor: [1, -24]
+  });
+
+  return (
+    <>
+      {pois.map((poi) => (
+        <Marker key={poi.id} position={[poi.lat, poi.lon]} icon={poiIcon}>
+          <Popup className="min-w-[150px]">
+            <div className="flex flex-col gap-2">
+              <span className="font-bold text-slate-800">{poi.name}</span>
+              <span className="text-[10px] text-slate-500 uppercase">{poi.category}</span>
+              <button 
+                onClick={() => onPoiSelect(poi.lat, poi.lon, poi.name)}
+                className="bg-blue-600 text-white text-xs font-bold py-1.5 rounded-lg w-full mt-1"
+              >
+                Segnala qui
+              </button>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
+    </>
   );
 }
