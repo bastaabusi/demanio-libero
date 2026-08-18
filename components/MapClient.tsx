@@ -5,9 +5,15 @@ import 'leaflet/dist/leaflet.css';
 import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { createClient } from '@/utils/supabase/client';
-import { Search, Crosshair, Check, AlertTriangle } from 'lucide-react';
+import { Search, Crosshair, Check, AlertTriangle, Flag } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { getDeviceId } from '@/lib/session';
+import { flagReportAction } from '@/app/actions/moderation';
 
-// Importiamo i nostri nuovi componenti puliti!
+// Importiamo il Clustering Magico!
+import MarkerClusterGroup from 'react-leaflet-cluster';
+
+// Componenti esterni
 import SearchAndFilters from './SearchAndFilters';
 import ReportForm from './ReportForm';
 
@@ -50,12 +56,15 @@ export default function MapClient() {
   const [flowState, setFlowState] = useState<'map' | 'draft' | 'form'>('map');
   const [draftLocation, setDraftLocation] = useState<{lat: number, lng: number} | null>(null);
   const [isGpsLoading, setIsGpsLoading] = useState(false);
+  const [isFlagging, setIsFlagging] = useState(false); // Stato per il caricamento del flag
+  
   const draftMarkerRef = useRef<L.Marker>(null);
 
   const fetchReports = async () => {
     const { data } = await supabase.from('reports').select('*').eq('status', 'published');
     if (data) setReports(data);
   };
+  
   useEffect(() => { fetchReports(); }, [supabase]);
 
   const filteredReports = activeCategory ? reports.filter(r => r.category === activeCategory) : reports;
@@ -77,6 +86,22 @@ export default function MapClient() {
     }
   };
 
+  // Funzione per gestire la segnalazione (Flag) di un abuso
+  const handleFlag = async (reportId: string) => {
+    setIsFlagging(true);
+    const deviceId = getDeviceId();
+    
+    const result = await flagReportAction(reportId, deviceId);
+    
+    if (result.success) {
+      toast.success(result.message);
+    } else {
+      toast.error(result.message);
+    }
+    
+    setIsFlagging(false);
+  };
+
   const eventHandlers = useMemo(() => ({
     dragend() {
       const marker = draftMarkerRef.current;
@@ -92,29 +117,60 @@ export default function MapClient() {
           <ChangeView center={mapCenter} zoom={mapZoom} />
           <ZoomControl position="bottomright" /> 
           <MapClickHandler active={flowState === 'map'} onLocationSelect={(lat, lng) => { setDraftLocation({lat, lng}); setFlowState('draft'); }} />
-          <TileLayer
-  attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
-  url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-/>
           
-          {filteredReports.map((report) => (
-            <Marker key={report.id} position={[report.latitude, report.longitude]}>
-              <Popup className="rounded-xl overflow-hidden min-w-[200px]">
-                <div className="flex flex-col gap-2 p-1 max-w-xs">
-                  {report.image_url && <img src={report.image_url} alt="Foto abuso" className="w-full h-32 object-cover rounded-lg border border-slate-100" />}
-                  <span className="text-[10px] font-bold text-white bg-blue-600 px-2 py-1 rounded-full uppercase tracking-wider self-start">{report.category.replace('_', ' ')}</span>
-                  <p className="text-sm mt-1 text-slate-800 font-medium leading-snug">{report.description}</p>
-                </div>
-              </Popup>
-            </Marker>
-          ))}
+          <TileLayer
+            attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
+            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          />
+          
+          {/* GRUPPO CLUSTER: Raggruppa i marker quando si fa zoom out */}
+          <MarkerClusterGroup chunkedLoading={true} maxClusterRadius={50}>
+            {filteredReports.map((report) => {
+              // Prendiamo la prima immagine dall'array image_urls (se esiste), altrimenti fallback su image_url
+              const displayImage = (report.image_urls && report.image_urls.length > 0) 
+                ? report.image_urls[0] 
+                : report.image_url;
+
+              return (
+                <Marker key={report.id} position={[report.latitude, report.longitude]}>
+                  <Popup className="rounded-xl overflow-hidden min-w-[200px]">
+                    <div className="flex flex-col gap-2 p-1 max-w-xs">
+                      {displayImage && (
+                        <img src={displayImage} alt="Foto abuso" className="w-full h-32 object-cover rounded-lg border border-slate-100" />
+                      )}
+                      
+                      <span className="text-[10px] font-bold text-white bg-blue-600 px-2 py-1 rounded-full uppercase tracking-wider self-start">
+                        {report.category.replace('_', ' ')}
+                      </span>
+                      
+                      <p className="text-sm mt-1 text-slate-800 font-medium leading-snug">
+                        {report.description}
+                      </p>
+
+                      {/* BOTTONE DI FLAG / SEGNALAZIONE */}
+                      <hr className="my-1 border-slate-100" />
+                      <button 
+                        onClick={() => handleFlag(report.id)}
+                        disabled={isFlagging}
+                        className="flex items-center gap-2 text-[11px] font-medium text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50 pt-1"
+                      >
+                        <Flag size={12} />
+                        {isFlagging ? 'Invio in corso...' : 'Segnala come inesatto'}
+                      </button>
+
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            })}
+          </MarkerClusterGroup>
+
           {draftLocation && <Marker draggable={flowState === 'draft'} eventHandlers={eventHandlers} position={[draftLocation.lat, draftLocation.lng]} ref={draftMarkerRef} icon={draftIcon} />}
         </MapContainer>
       </div>
 
       {flowState === 'map' && (
         <>
-          {/* USIAMO IL NUOVO COMPONENTE PER RICERCA E FILTRI */}
           <SearchAndFilters 
             onPlaceSelect={(lat, lng) => { setMapCenter([lat, lng]); setMapZoom(13); }} 
             activeCategory={activeCategory} 
@@ -122,10 +178,10 @@ export default function MapClient() {
           />
 
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-[500] opacity-80">
-  <div className="bg-slate-900/80 text-white px-5 py-3 rounded-full text-sm font-medium backdrop-blur-sm shadow-xl animate-pulse hidden md:block whitespace-nowrap">
-    Tocca la mappa o usa il GPS per segnalare
-  </div>
-</div>
+            <div className="bg-slate-900/80 text-white px-5 py-3 rounded-full text-sm font-medium backdrop-blur-sm shadow-xl animate-pulse hidden md:block whitespace-nowrap">
+              Tocca la mappa o usa il GPS per segnalare
+            </div>
+          </div>
           
           <div className="absolute bottom-6 left-0 right-0 z-[1000] p-4 pointer-events-none flex justify-center pb-safe">
             <button onClick={handleGpsRequest} disabled={isGpsLoading} className="pointer-events-auto flex items-center justify-center gap-3 bg-slate-900 text-white px-8 py-4 rounded-full font-bold shadow-2xl hover:scale-105 transition-all w-full max-w-xs">
@@ -151,7 +207,6 @@ export default function MapClient() {
          </div>
       )}
 
-      {/* USIAMO IL NUOVO COMPONENTE PER IL FORM */}
       {flowState === 'form' && draftLocation && (
         <ReportForm 
           draftLocation={draftLocation} 
