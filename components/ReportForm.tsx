@@ -182,6 +182,9 @@ export default function ReportForm({ draftLocation, onCancel, onSuccess }: Repor
                 </div>
               </div>
             )}
+            <p className="text-[10px] text-slate-500 mt-2 leading-tight">
+  ⚠️ Assicurati che nella foto <span className="font-bold">NON siano visibili volti di persone o targhe di veicoli</span>, nel rispetto della privacy.
+</p>
           </div>
 
           <div className="space-y-2">
@@ -208,18 +211,20 @@ export default function ReportForm({ draftLocation, onCancel, onSuccess }: Repor
           )}
 
           <div className="bg-red-50 p-4 rounded-xl border border-red-100">
-  <label className="flex items-center gap-3 cursor-pointer">
+  <label className="flex items-start gap-3 cursor-pointer">
     <input 
       type="checkbox" 
       required 
       checked={termsAccepted} 
-      ref={termsCheckboxRef}
       onChange={(e) => setTermsAccepted(e.target.checked)} 
-      className="w-5 h-5 accent-red-600 shrink-0" 
+      className="mt-1 w-5 h-5 accent-red-600 shrink-0" 
     />
-    <span className="text-xs text-red-900 leading-relaxed font-medium">
-      Dichiaro che i fatti sono veri (Art. 368 CP).
-    </span>
+    <div className="text-xs text-red-900 leading-relaxed font-medium">
+      <p>Dichiaro che i fatti sono veri, consapevole delle conseguenze penali per finte denunce (Art. 368 CP).</p>
+      <p className="mt-1">
+        Accetto i <a href="/tos" target="_blank" className="underline hover:text-red-700">Termini di Servizio</a> e la <a href="/privacy" target="_blank" className="underline hover:text-red-700">Privacy Policy</a>.
+      </p>
+    </div>
   </label>
 </div>
         </div>

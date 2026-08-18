@@ -214,6 +214,16 @@ export default function MapClient() {
           onSuccess={() => { setFlowState('map'); setDraftLocation(null); fetchReports(); }} 
         />
       )}
+      {flowState === 'map' && (
+  <div className="absolute top-4 right-4 z-[1000] flex gap-2">
+    <a href="/privacy" className="bg-white/90 backdrop-blur-sm text-slate-600 text-[10px] font-bold px-3 py-1.5 rounded-full shadow-sm hover:bg-white transition-colors">
+      Privacy
+    </a>
+    <a href="/tos" className="bg-white/90 backdrop-blur-sm text-slate-600 text-[10px] font-bold px-3 py-1.5 rounded-full shadow-sm hover:bg-white transition-colors">
+      Termini
+    </a>
+  </div>
+)}
     </div>
   );
 }
