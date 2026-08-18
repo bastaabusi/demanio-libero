@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { X, Camera, Trash2, Loader2, ShieldAlert } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { getDeviceId } from '@/lib/session';
-
+import toast from 'react-hot-toast';
 interface ReportFormProps {
   draftLocation: { lat: number, lng: number };
   onCancel: () => void;
@@ -29,31 +29,43 @@ export default function ReportForm({ draftLocation, onCancel, onSuccess }: Repor
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    const deviceId = getDeviceId();
-    let finalImageUrl = null;
+  e.preventDefault();
+  setIsSubmitting(true);
+  const deviceId = getDeviceId();
+  let finalImageUrl = null;
 
-    if (photoFile) {
-      const fileExt = photoFile.name.split('.').pop();
-      const fileName = `${deviceId}-${Date.now()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage.from('report-images').upload(fileName, photoFile);
-      if (!uploadError) {
-        const { data } = supabase.storage.from('report-images').getPublicUrl(fileName);
-        finalImageUrl = data.publicUrl;
-      }
+  // 1. Notifica di caricamento opzionale (utile se l'utente carica una foto pesante)
+  const loadingToast = toast.loading('Invio segnalazione in corso...');
+
+  if (photoFile) {
+    const fileExt = photoFile.name.split('.').pop();
+    const fileName = `${deviceId}-${Date.now()}.${fileExt}`;
+    const { error: uploadError } = await supabase.storage.from('report-images').upload(fileName, photoFile);
+    if (!uploadError) {
+      const { data } = supabase.storage.from('report-images').getPublicUrl(fileName);
+      finalImageUrl = data.publicUrl;
     }
+  }
 
-    const { error } = await supabase.from('reports').insert([{
-      category, description, amount_requested: amount ? parseFloat(amount) : null,
-      latitude: draftLocation.lat, longitude: draftLocation.lng,
-      ip_hash: deviceId, image_url: finalImageUrl, terms_accepted: termsAccepted
-    }]);
+  const { error } = await supabase.from('reports').insert([{
+    category, description, amount_requested: amount ? parseFloat(amount) : null,
+    latitude: draftLocation.lat, longitude: draftLocation.lng,
+    ip_hash: deviceId, image_url: finalImageUrl, terms_accepted: termsAccepted
+  }]);
 
-    setIsSubmitting(false);
-    if (error) alert("Errore durante l'invio. Riprova.");
-    else onSuccess();
-  };
+  setIsSubmitting(false);
+  
+  // 2. Rimuoviamo il toast di caricamento e mostriamo il risultato
+  toast.dismiss(loadingToast);
+
+  if (error) {
+    console.error(error);
+    toast.error("Errore durante l'invio. Riprova.");
+  } else {
+    toast.success('Segnalazione inviata con successo! In attesa di moderazione.');
+    onSuccess();
+  }
+};
 
   return (
     <div className="absolute inset-0 z-[2000] flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in">

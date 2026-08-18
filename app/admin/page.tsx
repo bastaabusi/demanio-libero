@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { LogOut, MapPin, CheckCircle, XCircle } from 'lucide-react';
 import { revalidatePath } from 'next/cache';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 export default async function AdminDashboard() {
   const cookieStore = await cookies();
@@ -25,17 +26,35 @@ export default async function AdminDashboard() {
   async function updateStatus(formData: FormData) {
     'use server';
     const id = formData.get('id') as string;
-    const newStatus = formData.get('status') as string;
-    const cookieStore = await cookies();
-    const supabaseServer = createClient(cookieStore);
+    const action = formData.get('action') as string;
     
-    await supabaseServer
-      .from('reports')
-      .update({ status: newStatus })
-      .eq('id', id);
+    // 1. CLIENT NORMALE: Verifichiamo che la richiesta venga davvero da te
+    const cookieStore = await cookies();
+    const supabaseUser = createClient(cookieStore);
+    const { data: { user } } = await supabaseUser.auth.getUser();
+
+    if (!user || user.email !== 'bastaabusi@proton.me') {
+      console.error("Tentativo di modifica non autorizzato!");
+      return;
+    }
+
+    // 2. SUPER CLIENT: Bypassiamo l'RLS per operare sul database
+    // Usiamo direttamente il pacchetto standard di Supabase con la chiave master
+    const supabaseAdmin = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+    console.log(`🔧 Aggiornamento status report ${id} a ${action}...`);
+    if (action === 'rejected') {
+      await supabaseAdmin.from('reports').update({ status: 'rejected' }).eq('id', id);
+      console.log(`✅ Report ${id} rifiutato.`);
+    } else {
+      await supabaseAdmin.from('reports').update({ status: 'published' }).eq('id', id);
+      console.log(`✅ Report ${id} pubblicato.`);
+    }
       
-    revalidatePath('/admin'); // Aggiorna la pagina
-    revalidatePath('/'); // Aggiorna la mappa pubblica
+    revalidatePath('/admin'); 
+    revalidatePath('/'); 
   }
 
   async function signOut() {
@@ -102,7 +121,8 @@ export default async function AdminDashboard() {
               <div className="flex md:flex-col gap-2 shrink-0 md:w-40">
                 <form action={updateStatus} className="flex-1">
                   <input type="hidden" name="id" value={report.id} />
-                  <input type="hidden" name="status" value="published" />
+                  {/* Modifica qui: name="action" */}
+                  <input type="hidden" name="action" value="published" />
                   <button type="submit" disabled={report.status === 'published'} className="w-full bg-green-50 text-green-700 hover:bg-green-100 p-3 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
                     <CheckCircle size={16} /> Pubblica
                   </button>
@@ -110,9 +130,10 @@ export default async function AdminDashboard() {
 
                 <form action={updateStatus} className="flex-1">
                   <input type="hidden" name="id" value={report.id} />
-                  <input type="hidden" name="status" value="rejected" />
-                  <button type="submit" disabled={report.status === 'rejected'} className="w-full bg-red-50 text-red-700 hover:bg-red-100 p-3 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
-                    <XCircle size={16} /> Rifiuta
+                  {/* Modifica qui: name="action" */}
+                  <input type="hidden" name="action" value="rejected" />
+                  <button type="submit" className="w-full bg-red-50 text-red-700 hover:bg-red-100 p-3 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
+                    <XCircle size={16} /> Rifiuta ed Elimina
                   </button>
                 </form>
               </div>

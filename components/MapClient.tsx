@@ -92,7 +92,10 @@ export default function MapClient() {
           <ChangeView center={mapCenter} zoom={mapZoom} />
           <ZoomControl position="bottomright" /> 
           <MapClickHandler active={flowState === 'map'} onLocationSelect={(lat, lng) => { setDraftLocation({lat, lng}); setFlowState('draft'); }} />
-          <TileLayer attribution='&copy; <a href="https://osm.org">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <TileLayer
+  attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
+  url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+/>
           
           {filteredReports.map((report) => (
             <Marker key={report.id} position={[report.latitude, report.longitude]}>
