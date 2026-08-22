@@ -302,14 +302,24 @@ Telefono: [INSERISCI IL TUO NUMERO]
   </button>
 
   {/* Bottone 3: Segnala (Discreto, in basso) */}
-  <button 
-    onClick={() => handleFlag(report.id)}
-    disabled={isFlagging}
-    className="flex items-center justify-center gap-1.5 text-[11px] font-medium text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50 mt-1"
-  >
-    <Flag size={12} />
-    {isFlagging ? 'Invio in corso...' : 'Segnala come falso/inesatto'}
-  </button>
+  <div className="flex items-center justify-between w-full mt-1">
+    <button 
+      onClick={() => handleFlag(report.id)}
+      disabled={isFlagging}
+      className="flex items-center justify-center gap-1.5 text-[11px] font-medium text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50"
+    >
+      <Flag size={12} />
+      {isFlagging ? 'Invio in corso...' : 'Segnala come falso'}
+    </button>
+    
+    {/* ID nascosto in bella vista per l'Admin */}
+    <span 
+      className="text-[9px] text-slate-300 font-mono cursor-text select-all" 
+      title="ID Segnalazione"
+    >
+      #{report.id.substring(0, 8)}
+    </span>
+  </div>
 </div>
 
                     </div>
