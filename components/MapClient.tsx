@@ -9,7 +9,7 @@ import { Search, Crosshair, Check, AlertTriangle, Flag, Plus, Mail } from 'lucid
 import toast from 'react-hot-toast';
 import { getDeviceId } from '@/lib/session';
 import { flagReportAction } from '@/app/actions/moderation';
-
+import { useSearchParams } from 'next/navigation';
 // Importiamo il Clustering Magico!
 import MarkerClusterGroup from 'react-leaflet-cluster';
 
@@ -26,6 +26,12 @@ L.Icon.Default.mergeOptions({
 
 const draftIcon = new L.Icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+});
+
+const previewIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
   iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
 });
@@ -76,7 +82,31 @@ function PopupTracker({ setIsPopupOpen }: { setIsPopupOpen: (isOpen: boolean) =>
   return null; 
 }
 
+function MapController() {
+  const map = useMap();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const lat = searchParams.get('lat');
+    const lng = searchParams.get('lng');
+    const zoom = searchParams.get('zoom');
+
+    if (lat && lng) {
+      // Se trova le coordinate, vola lì in automatico
+      map.setView(
+        [parseFloat(lat), parseFloat(lng)], 
+        zoom ? parseInt(zoom) : 18
+      );
+    }
+  }, [map, searchParams]);
+
+  return null;
+}
+
 export default function MapClient() {
+  const searchParams = useSearchParams();
+  const previewLat = searchParams.get('lat');
+  const previewLng = searchParams.get('lng');
   const supabase = createClient();
   
   const [reports, setReports] = useState<any[]>([]);
@@ -228,6 +258,10 @@ Telefono: [INSERISCI IL TUO NUMERO]
             url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
           /> */}
           <PopupTracker setIsPopupOpen={setIsPopupOpen} />
+
+          <MapController />
+  
+
           <TileLayer
   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
   url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}{r}.png"
@@ -328,6 +362,21 @@ Telefono: [INSERISCI IL TUO NUMERO]
               );
             })}
           </MarkerClusterGroup>
+
+          {previewLat && previewLng && (
+    <Marker 
+      position={[parseFloat(previewLat), parseFloat(previewLng)]} 
+      icon={previewIcon}
+      zIndexOffset={1000} // Lo tiene in primo piano sopra gli altri!
+    >
+      <Popup className="min-w-[150px]">
+        <div className="flex flex-col gap-1 text-center py-2">
+          <span className="font-bold text-orange-600 text-sm">📍 Modalità Preview</span>
+          <span className="text-xs text-slate-500">Posizione della segnalazione "Da approvare"</span>
+        </div>
+      </Popup>
+    </Marker>
+  )}
 
           {draftLocation && <Marker draggable={flowState === 'draft'} eventHandlers={eventHandlers} position={[draftLocation.lat, draftLocation.lng]} ref={draftMarkerRef} icon={draftIcon} />}
         </MapContainer>

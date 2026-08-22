@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { LogOut, MapPin, CheckCircle, XCircle, Flag, LayoutList, Search, Filter } from 'lucide-react';
+import { LogOut, MapPin, CheckCircle, XCircle, Flag, LayoutList, Search, Filter, Map } from 'lucide-react';
+import Link from 'next/link';
 
 export default function AdminClient({ initialReports, updateStatus, signOutAction }: any) {
   // STATI: Ora partono allineati su 'all'
@@ -163,6 +164,15 @@ export default function AdminClient({ initialReports, updateStatus, signOutActio
               </div>
 
               <div className="flex md:flex-col gap-2 shrink-0 md:w-40 justify-center">
+
+                <Link 
+                  href={`/?lat=${report.latitude}&lng=${report.longitude}&zoom=18`}
+                  target="_blank"
+                  className="w-full bg-blue-50 text-blue-700 hover:bg-blue-100 p-3 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2"
+                >
+                  <Map size={16} /> Vedi Mappa
+                </Link>
+
                 <form action={updateStatus} className="flex-1">
                   <input type="hidden" name="id" value={report.id} />
                   <input type="hidden" name="action" value="published" />
