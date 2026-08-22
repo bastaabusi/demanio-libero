@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { createClient } from '@/utils/supabase/client';
-import { Search, Crosshair, Check, AlertTriangle, Flag } from 'lucide-react';
+import { Search, Crosshair, Check, AlertTriangle, Flag, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getDeviceId } from '@/lib/session';
 import { flagReportAction } from '@/app/actions/moderation';
@@ -43,6 +43,26 @@ function MapClickHandler({ onLocationSelect, active }: { onLocationSelect: (lat:
   });
   return null;
 }
+
+// Funzione per generare lo stile personalizzato del cluster
+const createClusterCustomIcon = function (cluster: any) {
+  const count = cluster.getChildCount();
+  
+  let bgColor = 'bg-blue-600/90 text-white border-2 border-white shadow-lg';
+
+  if (count > 10 && count < 50) {
+    bgColor = 'bg-indigo-600/90 text-white border-2 border-white shadow-lg';
+  } else if (count >= 50) {
+    bgColor = 'bg-purple-600/90 text-white border-2 border-white shadow-lg';
+  }
+
+  return L.divIcon({
+    html: `<div class="flex items-center justify-center w-full h-full rounded-full font-bold text-xs ${bgColor}">${count}</div>`,
+    className: 'custom-cluster-icon',
+    iconSize: L.point(40, 40), // <-- Usiamo iconSize di Leaflet al posto di pointSize
+    iconAnchor: [20, 20]     // Centra perfettamente il cerchio rispetto alle coordinate
+  });
+};
 
 export default function MapClient() {
   const supabase = createClient();
@@ -89,7 +109,7 @@ export default function MapClient() {
   // Funzione per gestire la segnalazione (Flag) di un abuso
   const handleFlag = async (reportId: string) => {
     setIsFlagging(true);
-    const deviceId = getDeviceId();
+    const deviceId = await getDeviceId();
     
     const result = await flagReportAction(reportId, deviceId);
     
@@ -139,7 +159,7 @@ export default function MapClient() {
 />
           
           {/* GRUPPO CLUSTER: Raggruppa i marker quando si fa zoom out */}
-          <MarkerClusterGroup chunkedLoading={true} maxClusterRadius={50}>
+           <MarkerClusterGroup chunkedLoading={true} maxClusterRadius={50} iconCreateFunction={createClusterCustomIcon}>
             {filteredReports.map((report) => {
               // Prendiamo la prima immagine dall'array image_urls (se esiste), altrimenti fallback su image_url
               const displayImage = (report.image_urls && report.image_urls.length > 0) 
@@ -162,7 +182,7 @@ export default function MapClient() {
                         {report.description}
                       </p>
 
-                      {/* BOTTONE DI FLAG / SEGNALAZIONE */}
+                      {/* BOTTONE DI FLAG / SEGNALAZIONE
                       <hr className="my-1 border-slate-100" />
                       <button 
                         onClick={() => handleFlag(report.id)}
@@ -171,7 +191,34 @@ export default function MapClient() {
                       >
                         <Flag size={12} />
                         {isFlagging ? 'Invio in corso...' : 'Segnala come inesatto'}
-                      </button>
+                      </button> */}
+                      <hr className="my-2 border-slate-100" />
+<div className="flex items-center justify-between gap-2">
+  
+  {/* Bottone Segnala Falso (Esistente) */}
+  <button 
+    onClick={() => handleFlag(report.id)}
+    disabled={isFlagging}
+    className="flex items-center gap-1 text-[10px] font-medium text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50"
+  >
+    <Flag size={12} />
+    {isFlagging ? 'Invio...' : 'Falso'}
+  </button>
+
+  {/* NUOVO BOTTONE: Aggiungi qui */}
+  <button 
+    onClick={() => {
+      // 1. Copiamo le coordinate esatte di questo report
+      setDraftLocation({ lat: report.latitude, lng: report.longitude });
+      // 2. Apriamo direttamente il form!
+      setFlowState('form');
+    }}
+    className="flex items-center gap-1 text-[11px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1.5 rounded-lg hover:bg-blue-100 transition-colors"
+  >
+    <Plus size={14} /> Aggiungi anche tu
+  </button>
+  
+</div>
 
                     </div>
                   </Popup>

@@ -69,7 +69,7 @@ export default function ReportForm({ draftLocation, onCancel, onSuccess }: Repor
     }
 
     setIsSubmitting(true);
-    const deviceId = getDeviceId();
+    const deviceId = await getDeviceId();
 
     
     
