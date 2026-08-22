@@ -66,6 +66,16 @@ const createClusterCustomIcon = function (cluster: any) {
   });
 };
 
+function PopupTracker({ setIsPopupOpen }: { setIsPopupOpen: (isOpen: boolean) => void }) {
+  useMapEvents({
+    popupopen: () => setIsPopupOpen(true),
+    popupclose: () => setIsPopupOpen(false),
+  });
+  
+  // Non renderizza nulla sulla mappa, sta lì solo in ascolto invisibile
+  return null; 
+}
+
 export default function MapClient() {
   const supabase = createClient();
   
@@ -80,6 +90,11 @@ export default function MapClient() {
   const [isGpsLoading, setIsGpsLoading] = useState(false);
   const [isFlagging, setIsFlagging] = useState(false); // Stato per il caricamento del flag
   const [isEmailing, setIsEmailing] = useState<string | null>(null);
+  
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
+
+  // Aggiungi questo hook che ascolta la mappa
+  
   
   const draftMarkerRef = useRef<L.Marker>(null);
 
@@ -212,7 +227,7 @@ Telefono: [INSERISCI IL TUO NUMERO]
             attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
             url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
           /> */}
-
+          <PopupTracker setIsPopupOpen={setIsPopupOpen} />
           <TileLayer
   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
   url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}{r}.png"
@@ -262,39 +277,38 @@ Telefono: [INSERISCI IL TUO NUMERO]
                         <Flag size={12} />
                         {isFlagging ? 'Invio in corso...' : 'Segnala come inesatto'}
                       </button> */}
-                      <hr className="my-2 border-slate-100" />
-<div className="flex flex-col gap-2">
+                      <hr className="my-3 border-slate-100" />
+<div className="flex flex-col gap-2.5 w-full">
   
-  {/* Bottoni Principali */}
-  <div className="flex items-center gap-2">
-    <button 
-      onClick={() => handleEmailAuthorities(report)}
-      disabled={isEmailing === report.id}
-      className="flex-1 flex items-center justify-center gap-1 text-[11px] font-bold text-white bg-slate-800 py-1.5 rounded-lg hover:bg-slate-700 transition-colors shadow-sm disabled:opacity-50"
-    >
-      <Mail size={13} /> 
-      {isEmailing === report.id ? 'Attendi...' : 'Invia alle Autorità'}
-    </button>
+  {/* Bottone 1: Aggiungi (Azione principale della community) */}
+  <button 
+    onClick={() => {
+      setDraftLocation({ lat: report.latitude, lng: report.longitude });
+      setFlowState('form');
+    }}
+    className="w-full px-4 flex items-center justify-center gap-2 text-sm font-bold text-blue-700 bg-blue-50 py-2 rounded-xl hover:bg-blue-100 transition-colors"
+  >
+    <Plus size={16} /> Aggiungi Segnalazione
+  </button>
 
-    <button 
-      onClick={() => {
-        setDraftLocation({ lat: report.latitude, lng: report.longitude });
-        setFlowState('form');
-      }}
-      className="flex-1 flex items-center justify-center gap-1 text-[11px] font-bold text-blue-700 bg-blue-50 py-1.5 rounded-lg hover:bg-blue-100 transition-colors"
-    >
-      <Plus size={13} /> Aggiungi
-    </button>
-  </div>
+  {/* Bottone 2: Autorità (Azione esterna) */}
+  <button 
+    onClick={() => handleEmailAuthorities(report)}
+    disabled={isEmailing === report.id}
+    className="w-full flex items-center justify-center gap-2 text-sm font-bold text-white bg-slate-800 py-2 rounded-xl hover:bg-slate-700 transition-colors shadow-sm disabled:opacity-50"
+  >
+    <Mail size={16} /> 
+    {isEmailing === report.id ? 'Attendi...' : 'Invia alle Autorità'}
+  </button>
 
-  {/* Bottone Segnala Falso (Nascosto sotto, meno invasivo) */}
+  {/* Bottone 3: Segnala (Discreto, in basso) */}
   <button 
     onClick={() => handleFlag(report.id)}
     disabled={isFlagging}
-    className="self-center flex items-center gap-1 text-[10px] font-medium text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50 mt-1"
+    className="flex items-center justify-center gap-1.5 text-[11px] font-medium text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50 mt-1"
   >
-    <Flag size={10} />
-    {isFlagging ? 'Invio...' : 'Segnala come falso/inesatto'}
+    <Flag size={12} />
+    {isFlagging ? 'Invio in corso...' : 'Segnala come falso/inesatto'}
   </button>
 </div>
 
@@ -317,11 +331,11 @@ Telefono: [INSERISCI IL TUO NUMERO]
             onCategoryChange={setActiveCategory} 
           />
 
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-[500] opacity-80">
+          {!isPopupOpen && (<div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-[500] opacity-80">
             <div className="bg-slate-900/80 text-white px-5 py-3 rounded-full text-sm font-medium backdrop-blur-sm shadow-xl animate-pulse hidden md:block whitespace-nowrap">
               Tocca la mappa o usa il GPS per segnalare
             </div>
-          </div>
+          </div>)}
           
           <div className="absolute bottom-6 left-0 right-0 z-[1000] p-4 pointer-events-none flex justify-center pb-safe">
             <button onClick={handleGpsRequest} disabled={isGpsLoading} className="pointer-events-auto flex items-center justify-center gap-3 bg-slate-900 text-white px-8 py-4 rounded-full font-bold shadow-2xl hover:scale-105 transition-all w-full max-w-xs">
