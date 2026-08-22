@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { createClient } from '@/utils/supabase/client';
-import { Search, Crosshair, Check, AlertTriangle, Flag, Plus } from 'lucide-react';
+import { Search, Crosshair, Check, AlertTriangle, Flag, Plus, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getDeviceId } from '@/lib/session';
 import { flagReportAction } from '@/app/actions/moderation';
@@ -35,6 +35,8 @@ function ChangeView({ center, zoom }: { center: [number, number], zoom: number }
   useEffect(() => { map.flyTo(center, zoom, { duration: 1.5 }); }, [center, zoom, map]);
   return null;
 }
+
+
 
 function MapClickHandler({ onLocationSelect, active }: { onLocationSelect: (lat: number, lng: number) => void, active: boolean }) {
   useMapEvents({
@@ -77,6 +79,7 @@ export default function MapClient() {
   const [draftLocation, setDraftLocation] = useState<{lat: number, lng: number} | null>(null);
   const [isGpsLoading, setIsGpsLoading] = useState(false);
   const [isFlagging, setIsFlagging] = useState(false); // Stato per il caricamento del flag
+  const [isEmailing, setIsEmailing] = useState<string | null>(null);
   
   const draftMarkerRef = useRef<L.Marker>(null);
 
@@ -128,6 +131,73 @@ export default function MapClient() {
       if (marker) setDraftLocation({ lat: marker.getLatLng().lat, lng: marker.getLatLng().lng });
     },
   }), []);
+
+  // NUOVA FUNZIONE ASINCRONA
+  const handleEmailAuthorities = async (report: any) => {
+    setIsEmailing(report.id); // Mostriamo il caricamento
+
+    try {
+      // 1. Troviamo la città esatta dalle coordinate
+      let city = "Tuo Comune";
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${report.latitude}&lon=${report.longitude}&format=json&addressdetails=1`,
+          { headers: { 'Accept-Language': 'it' } }
+        );
+        const data = await res.json();
+        if (data && data.address) {
+           city = data.address.city || data.address.town || data.address.village || data.address.municipality || "Tuo Comune";
+        }
+      } catch (e) {
+        console.error("Errore reverse geocoding", e);
+      }
+
+      // 2. Scegliamo l'Autorità e la frase da cercare su Google
+      let searchTip = `"PEC Polizia Locale Comune di ${city}"`;
+      
+      const cat = report.category.toLowerCase();
+      if (cat.includes('spiaggia') || cat.includes('lido') || cat.includes('costa') || cat.includes('mare')) {
+        searchTip = `"PEC Capitaneria di Porto ${city}"`;
+      } else if (cat.includes('scontrino') || cat.includes('fiscale') || cat.includes('concessione')) {
+        searchTip = `"PEC Guardia di Finanza ${city}"`;
+      }
+
+      // 3. Prepariamo l'Oggetto
+      const subject = encodeURIComponent(`Esposto/Segnalazione presunto illecito: ${report.category.replace('_', ' ')}`);
+      
+      // 4. Prepariamo il Corpo della Mail con le istruzioni guidate
+      const body = encodeURIComponent(`Spett.le Comando,
+
+con la presente desidero segnalare un presunto illecito di cui sono stato testimone.
+
+📍 LUOGO: ${report.location_name ? report.location_name : `Coordinate GPS: ${report.latitude}, ${report.longitude}`} (${city})
+📝 DESCRIZIONE: 
+${report.description}
+
+(Questa segnalazione è stata pubblicata anche sulla piattaforma civica Demanio Libero).
+
+Resto a disposizione per eventuali chiarimenti.
+
+Cordiali saluti,
+
+Nome: [INSERISCI NOME E COGNOME]
+Telefono: [INSERISCI IL TUO NUMERO]
+
+----------------------------------
+⚠️ COSA DEVI FARE ORA PER INVIARE LA SEGNALAZIONE:
+1. Vai su Google e cerca esattamente questa frase: 
+   ${searchTip}
+2. Copia l'indirizzo Email o PEC che trovi sui siti istituzionali.
+3. Incollalo nel campo "A:" (Destinatario) di questa email in alto.
+4. Premi Invia.`);
+
+      // 5. Apriamo l'app di posta
+      window.location.href = `mailto:?subject=${subject}&body=${body}`;
+      
+    } finally {
+      setIsEmailing(null); // Togliamo il caricamento
+    }
+  };
 
   return (
     <div className="relative w-full h-full min-h-[100dvh] overflow-hidden">
@@ -193,31 +263,39 @@ export default function MapClient() {
                         {isFlagging ? 'Invio in corso...' : 'Segnala come inesatto'}
                       </button> */}
                       <hr className="my-2 border-slate-100" />
-<div className="flex items-center justify-between gap-2">
+<div className="flex flex-col gap-2">
   
-  {/* Bottone Segnala Falso (Esistente) */}
+  {/* Bottoni Principali */}
+  <div className="flex items-center gap-2">
+    <button 
+      onClick={() => handleEmailAuthorities(report)}
+      disabled={isEmailing === report.id}
+      className="flex-1 flex items-center justify-center gap-1 text-[11px] font-bold text-white bg-slate-800 py-1.5 rounded-lg hover:bg-slate-700 transition-colors shadow-sm disabled:opacity-50"
+    >
+      <Mail size={13} /> 
+      {isEmailing === report.id ? 'Attendi...' : 'Invia alle Autorità'}
+    </button>
+
+    <button 
+      onClick={() => {
+        setDraftLocation({ lat: report.latitude, lng: report.longitude });
+        setFlowState('form');
+      }}
+      className="flex-1 flex items-center justify-center gap-1 text-[11px] font-bold text-blue-700 bg-blue-50 py-1.5 rounded-lg hover:bg-blue-100 transition-colors"
+    >
+      <Plus size={13} /> Aggiungi
+    </button>
+  </div>
+
+  {/* Bottone Segnala Falso (Nascosto sotto, meno invasivo) */}
   <button 
     onClick={() => handleFlag(report.id)}
     disabled={isFlagging}
-    className="flex items-center gap-1 text-[10px] font-medium text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50"
+    className="self-center flex items-center gap-1 text-[10px] font-medium text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50 mt-1"
   >
-    <Flag size={12} />
-    {isFlagging ? 'Invio...' : 'Falso'}
+    <Flag size={10} />
+    {isFlagging ? 'Invio...' : 'Segnala come falso/inesatto'}
   </button>
-
-  {/* NUOVO BOTTONE: Aggiungi qui */}
-  <button 
-    onClick={() => {
-      // 1. Copiamo le coordinate esatte di questo report
-      setDraftLocation({ lat: report.latitude, lng: report.longitude });
-      // 2. Apriamo direttamente il form!
-      setFlowState('form');
-    }}
-    className="flex items-center gap-1 text-[11px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1.5 rounded-lg hover:bg-blue-100 transition-colors"
-  >
-    <Plus size={14} /> Aggiungi anche tu
-  </button>
-  
 </div>
 
                     </div>
